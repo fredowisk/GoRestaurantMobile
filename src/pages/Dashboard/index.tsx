@@ -33,8 +33,8 @@ interface Food {
   name: string;
   description: string;
   price: number;
+  category: number;
   thumbnail_url: string;
-  formattedPrice: string;
 }
 
 interface Category {
@@ -54,27 +54,53 @@ const Dashboard: React.FC = () => {
   const navigation = useNavigation();
 
   async function handleNavigate(id: number): Promise<void> {
-    // Navigate do ProductDetails page
+    navigation.navigate('FoodDetails', { id });
   }
 
   useEffect(() => {
     async function loadFoods(): Promise<void> {
-      // Load Foods from API
+      // fazendo uma requisição get passando como parâmetro a categoria selecionada,
+      // para encontrarmos apenas as foods que sejam daquela categoria
+      await api
+        .get('foods', {
+          params: {
+            category_like: selectedCategory,
+            // se não tiver nenhuma categoria selecionada, ele retorna todas as foods
+          },
+        })
+        .then(response => {
+          // setando o array de foods para aparecer em tela
+          setFoods(response.data);
+        });
     }
-
     loadFoods();
-  }, [selectedCategory, searchValue]);
+  }, [selectedCategory]);
 
   useEffect(() => {
     async function loadCategories(): Promise<void> {
-      // Load categories from API
+      // procurando por todas as categorias e setando elas para aparecer em tela
+      api.get('categories').then(response => setCategories(response.data));
     }
 
     loadCategories();
   }, []);
 
   function handleSelectCategory(id: number): void {
-    // Select / deselect category
+    setSelectedCategory(id);
+  }
+
+  // Função que será disparada após o usuário fazer o submit da pesquisa
+  async function handleSearchFoodByName(): Promise<void> {
+    // pegando a food que tiver o nome que foi digitado
+    const response = await api.get(`foods/?name=${searchValue}`);
+    // setando a food para aparecer em tela
+    setFoods(response.data);
+    // procurando se a food existe, pois é retornado um array de foods, por mais que a food informada
+    // seja apenas 1, precisamos usar o find para ter acesso as suas propriedades
+    response.data.find((food: Food) =>
+      // se o nome for encontrado faça um set na categoria, se não retorne 0
+      food.name === searchValue ? setSelectedCategory(food.category) : 0,
+    );
   }
 
   return (
@@ -93,6 +119,7 @@ const Dashboard: React.FC = () => {
           value={searchValue}
           onChangeText={setSearchValue}
           placeholder="Qual comida você procura?"
+          onSubmitEditing={handleSearchFoodByName}
         />
       </FilterContainer>
       <ScrollView>
@@ -141,7 +168,7 @@ const Dashboard: React.FC = () => {
                 <FoodContent>
                   <FoodTitle>{food.name}</FoodTitle>
                   <FoodDescription>{food.description}</FoodDescription>
-                  <FoodPricing>{food.formattedPrice}</FoodPricing>
+                  <FoodPricing>{formatValue(food.price)}</FoodPricing>
                 </FoodContent>
               </Food>
             ))}
